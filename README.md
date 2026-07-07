@@ -3,8 +3,8 @@
 ## Run
 
 1. `cd D:\mycopilot\ci-scan-dashboard`
-2. `python -m pip install -r requirements.txt`
-3. `python app.py`
+2. `uv sync`
+3. `uv run python app.py`
 4. Open `http://127.0.0.1:8000`
 
 ## Notes

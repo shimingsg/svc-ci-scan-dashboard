@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CI Scan Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+<body>
+  <div class="wrap">
+    <h1>[CI-Scan] Dashboard</h1>
+    <div class="muted">Repo: <strong>dotnet/runtime</strong> · title prefix: <strong>[ci-scan]</strong></div>
+
+    <div class="bar">
+      <button id="syncBtn">Sync from GitHub</button>
+      <label for="viewMode">Show:</label>
+      <select id="viewMode">
+        <option value="all">All issues</option>
+        <option value="analyzed">Analyzed only</option>
+        <option value="pending">Pending only</option>
+      </select>
+      <label for="stateFilter">State:</label>
+      <select id="stateFilter">
+        <option value="all">All states</option>
+        <option value="open">Open</option>
+        <option value="closed">Closed</option>
+      </select>
+      <label for="showNoteDefault">
+        <input id="showNoteDefault" type="checkbox" />
+        Show note by default
+      </label>
+      <span id="summary" class="muted"></span>
+    </div>
+
+    <div class="datetime-panel">
+      <div class="datetime-sort-row">
+        <strong class="muted">Sort:</strong>
+        <select id="sortBy">
+          <option value="createdAt">createdAt</option>
+          <option value="updatedAt">updatedAt</option>
+        </select>
+        <select id="sortDir">
+          <option value="desc">Newest first</option>
+          <option value="asc">Oldest first</option>
+        </select>
+        <strong class="muted">Group:</strong>
+        <select id="groupBy">
+          <option value="none">None</option>
+          <option value="status">Status</option>
+          <option value="createdAt">Created date</option>
+        </select>
+      </div>
+      <div class="datetime-row">
+        <div class="datetime-field">
+          <label for="createdFrom">Created from:</label>
+          <div class="datetime-input-group">
+            <input id="createdFrom" type="text" placeholder="YYYY-MM-DDTHH:mm" />
+            <input id="createdFromPicker" type="datetime-local" class="picker-hidden" />
+            <button id="createdFromSelectBtn" type="button">Select</button>
+            <button id="createdFromClearBtn" type="button">Clear</button>
+          </div>
+        </div>
+        <div class="datetime-field">
+          <label for="createdTo">Created to:</label>
+          <div class="datetime-input-group">
+            <input id="createdTo" type="text" placeholder="YYYY-MM-DDTHH:mm" />
+            <input id="createdToPicker" type="datetime-local" class="picker-hidden" />
+            <button id="createdToSelectBtn" type="button">Select</button>
+            <button id="createdToClearBtn" type="button">Clear</button>
+          </div>
+        </div>
+      </div>
+      <div class="datetime-row">
+        <div class="datetime-field">
+          <label for="updatedFrom">Updated from:</label>
+          <div class="datetime-input-group">
+            <input id="updatedFrom" type="text" placeholder="YYYY-MM-DDTHH:mm" />
+            <input id="updatedFromPicker" type="datetime-local" class="picker-hidden" />
+            <button id="updatedFromSelectBtn" type="button">Select</button>
+            <button id="updatedFromClearBtn" type="button">Clear</button>
+          </div>
+        </div>
+        <div class="datetime-field">
+          <label for="updatedTo">Updated to:</label>
+          <div class="datetime-input-group">
+            <input id="updatedTo" type="text" placeholder="YYYY-MM-DDTHH:mm" />
+            <input id="updatedToPicker" type="datetime-local" class="picker-hidden" />
+            <button id="updatedToSelectBtn" type="button">Select</button>
+            <button id="updatedToClearBtn" type="button">Clear</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="status" class="status"></div>
+    <div id="list" class="list"></div>
+  </div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "view": "pending",
+  "state": "open",
+  "sortBy": "createdAt",
+  "sortDir": "desc",
+  "groupBy": "createdAt",
+  "showNoteByDefault": false,
+  "createdFrom": "",
+  "createdTo": "",
+  "updatedFrom": "",
+  "updatedTo": ""
+}

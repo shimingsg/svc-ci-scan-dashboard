@@ -1,10 +1,14 @@
 import json
+import logging
 import sqlite3
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
+
+logger = logging.getLogger(__name__)
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -33,13 +37,13 @@ DEFAULT_DASHBOARD_CONFIG = {
 
 
 def get_connection() -> sqlite3.Connection:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def init_db() -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     with get_connection() as conn:
         conn.execute(
             """
@@ -107,8 +111,6 @@ def fetch_github_ci_scan_issues() -> list[dict]:
                 "url": item.get("html_url", ""),
                 "createdAt": item.get("created_at", ""),
                 "updatedAt": item.get("updated_at", ""),
-                "analyzedDone": False,
-                "note": "",
             }
 
         if len(items) < per_page:
@@ -119,17 +121,21 @@ def fetch_github_ci_scan_issues() -> list[dict]:
 
 
 def save_datasource(rows: list[dict]) -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
     DATASOURCE_FILE.write_text(json.dumps(rows, indent=2), encoding="utf-8")
 
 
 def normalize_dashboard_config(raw: dict) -> dict:
     normalized = dict(DEFAULT_DASHBOARD_CONFIG)
-    normalized["view"] = raw.get("view") if raw.get("view") in {"all", "analyzed", "pending"} else normalized["view"]
-    normalized["state"] = raw.get("state") if raw.get("state") in {"all", "open", "closed"} else normalized["state"]
-    normalized["sortBy"] = raw.get("sortBy") if raw.get("sortBy") in {"createdAt", "updatedAt"} else normalized["sortBy"]
-    normalized["sortDir"] = raw.get("sortDir") if raw.get("sortDir") in {"asc", "desc"} else normalized["sortDir"]
-    normalized["groupBy"] = raw.get("groupBy") if raw.get("groupBy") in {"none", "status", "createdAt"} else normalized["groupBy"]
+
+    def _pick(key: str, allowed: set) -> object:
+        val = raw.get(key)
+        return val if val in allowed else normalized[key]
+
+    normalized["view"] = _pick("view", {"all", "analyzed", "pending"})
+    normalized["state"] = _pick("state", {"all", "open", "closed"})
+    normalized["sortBy"] = _pick("sortBy", {"createdAt", "updatedAt"})
+    normalized["sortDir"] = _pick("sortDir", {"asc", "desc"})
+    normalized["groupBy"] = _pick("groupBy", {"none", "status", "createdAt"})
     normalized["showNoteByDefault"] = bool(raw.get("showNoteByDefault", normalized["showNoteByDefault"]))
 
     for key in ["createdFrom", "createdTo", "updatedFrom", "updatedTo"]:
@@ -155,7 +161,6 @@ def load_dashboard_config() -> dict:
 
 
 def save_dashboard_config(config: dict) -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
     CONFIG_FILE.write_text(
         json.dumps(config, indent=2),
         encoding="utf-8",
@@ -168,30 +173,12 @@ def sync_issues() -> int:
 
     with get_connection() as conn:
         for row in rows:
-            if not isinstance(row, dict):
-                continue
-            title = row.get("title")
-            if not isinstance(title, str) or not title.startswith(TITLE_PREFIX):
-                continue
-
-            issue_id = row.get("id")
-            number = row.get("number")
-            state = row.get("state", "")
-            url = row.get("url", "")
-            updated_at = row.get("updatedAt", "")
-            created_at = row.get("createdAt", row.get("created_at", updated_at))
-            analyzed_done = 1 if row.get("analyzedDone", False) else 0
-            note = row.get("note", "")
-
-            if not isinstance(issue_id, int) or not isinstance(number, int):
-                continue
-
             conn.execute(
                 """
                 INSERT INTO issues (
                     id, number, title, state, url, created_at, updated_at, analyzed_done, note
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 0, '')
                 ON CONFLICT(id) DO UPDATE SET
                     number = excluded.number,
                     title = excluded.title,
@@ -203,15 +190,13 @@ def sync_issues() -> int:
                     note = issues.note
                 """,
                 (
-                    issue_id,
-                    number,
-                    title,
-                    state,
-                    url,
-                    created_at,
-                    updated_at,
-                    analyzed_done,
-                    note,
+                    row["id"],
+                    row["number"],
+                    row["title"],
+                    row["state"],
+                    row["url"],
+                    row["createdAt"],
+                    row["updatedAt"],
                 ),
             )
 
@@ -257,25 +242,20 @@ def get_issues():
         clauses.append("datetime(updated_at) <= datetime(?)")
         params.append(updated_to)
 
-    where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    where_clause = "WHERE " + " AND ".join(clauses) if clauses else ""
     col = "updated_at" if sort_by == "updatedAt" else "created_at"
     direction = "ASC" if sort_dir == "asc" else "DESC"
     order_clause = f"ORDER BY datetime({col}) {direction}, number {direction}"
 
+    sql = (
+        "SELECT id, number, title, state, url, created_at, updated_at, analyzed_done, note"
+        " FROM issues"
+        f" {where_clause}"
+        f" {order_clause}"
+    )
+
     with get_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT id, number, title, state, url, created_at, updated_at, analyzed_done, note
-            FROM issues
-            """
-            + where_clause
-            + """
-            """
-            + order_clause
-            + """
-            """,
-            params,
-        ).fetchall()
+        rows = conn.execute(sql, params).fetchall()
 
     return jsonify(
         [
@@ -337,8 +317,15 @@ def post_sync():
     try:
         count = sync_issues()
         return jsonify({"ok": True, "count": count})
+    except urllib.error.HTTPError as ex:
+        logger.exception("GitHub API error during sync")
+        return jsonify({"ok": False, "error": f"GitHub API error {ex.code}: {ex.reason}"}), 502
+    except urllib.error.URLError as ex:
+        logger.exception("Network error during sync")
+        return jsonify({"ok": False, "error": f"Network error: {ex.reason}"}), 502
     except Exception as ex:
-        return jsonify({"ok": False, "error": str(ex)}), 400
+        logger.exception("Unexpected error during sync")
+        return jsonify({"ok": False, "error": str(ex)}), 500
 
 
 @app.post("/api/issues/<int:issue_id>/analysis")
@@ -364,6 +351,7 @@ def post_analysis(issue_id: int):
     return jsonify({"ok": True})
 
 
+init_db()
+
 if __name__ == "__main__":
-    init_db()
     app.run(host="127.0.0.1", port=8000, debug=True)

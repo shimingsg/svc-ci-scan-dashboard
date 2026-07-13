@@ -1,5 +1,6 @@
 import json
 import logging
+import shutil
 import sqlite3
 import urllib.error
 import urllib.parse
@@ -13,12 +14,10 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
-DB_PATH = DATA_DIR / "issues.db"
+LEGACY_DB_PATH = DATA_DIR / "issues.db"
 DATASOURCE_FILE = DATA_DIR / "ci-scan-issues.json"
-CONFIG_FILE = DATA_DIR / "dashboard-config.json"
-REPO_OWNER = "dotnet"
-REPO_NAME = "runtime"
-TITLE_PREFIX = "[ci-scan]"
+DASHBOARD_CONFIG_FILE = DATA_DIR / "dashboard-config.json"
+PROJECT_CONFIG_FILE = BASE_DIR / "ci-scan-config.json"
 
 app = Flask(__name__)
 
@@ -36,16 +35,35 @@ DEFAULT_DASHBOARD_CONFIG = {
     "updatedTo": "",
 }
 
+DEFAULT_PROJECT_CONFIG = {
+    "repo": "dotnet/runtime",
+    "titlePrefix": "[ci-scan]",
+}
 
-def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+
+def get_repo_db_path(repo: str) -> Path:
+    safe_repo = repo.replace("/", "_")
+    return DATA_DIR / f"{safe_repo}_issues.db"
+
+
+def get_connection(repo: str | None = None) -> sqlite3.Connection:
+    project_config = load_project_config() if repo is None else {"repo": repo}
+    conn = sqlite3.connect(get_repo_db_path(project_config["repo"]))
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def init_db() -> None:
+def init_db(repo: str | None = None) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    with get_connection() as conn:
+    project_config = load_project_config() if repo is None else {"repo": repo}
+    db_path = get_repo_db_path(project_config["repo"])
+    if (
+        project_config["repo"] == DEFAULT_PROJECT_CONFIG["repo"]
+        and LEGACY_DB_PATH.exists()
+        and not db_path.exists()
+    ):
+        shutil.copy2(LEGACY_DB_PATH, db_path)
+    with get_connection(project_config["repo"]) as conn:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS issues (
@@ -57,20 +75,85 @@ def init_db() -> None:
                 created_at    TEXT    NOT NULL,
                 updated_at    TEXT    NOT NULL,
                 analyzed_done INTEGER NOT NULL DEFAULT 0,
-                note          TEXT    NOT NULL DEFAULT ''
+                note          TEXT    NOT NULL DEFAULT '',
+                source_repo   TEXT    NOT NULL DEFAULT 'dotnet/runtime',
+                title_prefix  TEXT    NOT NULL DEFAULT '[ci-scan]'
             )
             """
         )
+        columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(issues)").fetchall()
+        }
+        if "source_repo" not in columns:
+            conn.execute(
+                "ALTER TABLE issues ADD COLUMN source_repo TEXT NOT NULL DEFAULT 'dotnet/runtime'"
+            )
+        if "title_prefix" not in columns:
+            conn.execute(
+                "ALTER TABLE issues ADD COLUMN title_prefix TEXT NOT NULL DEFAULT '[ci-scan]'"
+            )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_issues_analyzed_done ON issues(analyzed_done)"
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_issues_state ON issues(state)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_issues_source ON issues(source_repo, title_prefix)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_issues_created_at ON issues(created_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_issues_updated_at ON issues(updated_at)")
 
 
-def fetch_github_ci_scan_issues() -> list[dict]:
-    query = f'repo:{REPO_OWNER}/{REPO_NAME} is:issue in:title "{TITLE_PREFIX}"'
+def normalize_project_config(raw: dict) -> dict:
+    normalized = dict(DEFAULT_PROJECT_CONFIG)
+
+    repo = raw.get("repo", normalized["repo"])
+    if isinstance(repo, str):
+        repo = repo.strip()
+        parts = repo.split("/")
+        if (
+            len(parts) == 2
+            and all(part for part in parts)
+            and all(part.replace("-", "").replace("_", "").replace(".", "").isalnum() for part in parts)
+        ):
+            normalized["repo"] = repo
+
+    title_prefix = raw.get("titlePrefix", normalized["titlePrefix"])
+    if isinstance(title_prefix, str) and title_prefix.strip():
+        normalized["titlePrefix"] = title_prefix.strip()
+
+    return normalized
+
+
+def load_project_config() -> dict:
+    if not PROJECT_CONFIG_FILE.exists():
+        return dict(DEFAULT_PROJECT_CONFIG)
+
+    raw = PROJECT_CONFIG_FILE.read_text(encoding="utf-8").strip()
+    if not raw:
+        return dict(DEFAULT_PROJECT_CONFIG)
+
+    data = json.loads(raw)
+    if not isinstance(data, dict):
+        raise ValueError("project config must be a JSON object")
+
+    return normalize_project_config(data)
+
+
+def save_project_config(config: dict) -> None:
+    PROJECT_CONFIG_FILE.write_text(
+        json.dumps(config, indent=2),
+        encoding="utf-8",
+    )
+
+
+def init_project_config() -> None:
+    if not PROJECT_CONFIG_FILE.exists():
+        save_project_config(dict(DEFAULT_PROJECT_CONFIG))
+
+
+def fetch_github_ci_scan_issues(project_config: dict) -> list[dict]:
+    repo = project_config["repo"]
+    title_prefix = project_config["titlePrefix"]
+    query = f'repo:{repo} is:issue in:title "{title_prefix}"'
     page = 1
     per_page = 100
     by_id: dict[int, dict] = {}
@@ -97,7 +180,7 @@ def fetch_github_ci_scan_issues() -> list[dict]:
             if not isinstance(item, dict):
                 continue
             title = item.get("title")
-            if not isinstance(title, str) or not title.startswith(TITLE_PREFIX):
+            if not isinstance(title, str) or not title.startswith(title_prefix):
                 continue
             issue_id = item.get("id")
             number = item.get("number")
@@ -163,10 +246,10 @@ def parse_issue_numbers(raw: str | None) -> list[int]:
 
 
 def load_dashboard_config() -> dict:
-    if not CONFIG_FILE.exists():
+    if not DASHBOARD_CONFIG_FILE.exists():
         return dict(DEFAULT_DASHBOARD_CONFIG)
 
-    raw = CONFIG_FILE.read_text(encoding="utf-8").strip()
+    raw = DASHBOARD_CONFIG_FILE.read_text(encoding="utf-8").strip()
     if not raw:
         return dict(DEFAULT_DASHBOARD_CONFIG)
 
@@ -178,14 +261,15 @@ def load_dashboard_config() -> dict:
 
 
 def save_dashboard_config(config: dict) -> None:
-    CONFIG_FILE.write_text(
+    DASHBOARD_CONFIG_FILE.write_text(
         json.dumps(config, indent=2),
         encoding="utf-8",
     )
 
 
 def sync_issues() -> int:
-    rows = fetch_github_ci_scan_issues()
+    project_config = load_project_config()
+    rows = fetch_github_ci_scan_issues(project_config)
     save_datasource(rows)
 
     with get_connection() as conn:
@@ -193,9 +277,10 @@ def sync_issues() -> int:
             conn.execute(
                 """
                 INSERT INTO issues (
-                    id, number, title, state, url, created_at, updated_at, analyzed_done, note
+                    id, number, title, state, url, created_at, updated_at,
+                    analyzed_done, note, source_repo, title_prefix
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, 0, '')
+                VALUES (?, ?, ?, ?, ?, ?, ?, 0, '', ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     number = excluded.number,
                     title = excluded.title,
@@ -203,6 +288,8 @@ def sync_issues() -> int:
                     url = excluded.url,
                     created_at = excluded.created_at,
                     updated_at = excluded.updated_at,
+                    source_repo = excluded.source_repo,
+                    title_prefix = excluded.title_prefix,
                     analyzed_done = issues.analyzed_done,
                     note = issues.note
                 """,
@@ -214,10 +301,19 @@ def sync_issues() -> int:
                     row["url"],
                     row["createdAt"],
                     row["updatedAt"],
+                    project_config["repo"],
+                    project_config["titlePrefix"],
                 ),
             )
 
-        total = conn.execute("SELECT COUNT(*) AS c FROM issues").fetchone()["c"]
+        total = conn.execute(
+            """
+            SELECT COUNT(*) AS c
+            FROM issues
+            WHERE source_repo = ? AND title_prefix = ?
+            """,
+            (project_config["repo"], project_config["titlePrefix"]),
+        ).fetchone()["c"]
         return int(total)
 
 
@@ -228,6 +324,7 @@ def index():
 
 @app.get("/api/issues")
 def get_issues():
+    project_config = load_project_config()
     view = request.args.get("view", "all")
     issue_state = request.args.get("state", "all")
     issue_ids = request.args.get("issueIds")
@@ -238,8 +335,8 @@ def get_issues():
     updated_from = request.args.get("updatedFrom")
     updated_to = request.args.get("updatedTo")
 
-    clauses: list[str] = []
-    params: list[str] = []
+    clauses: list[str] = ["source_repo = ?", "title_prefix = ?"]
+    params: list[str] = [project_config["repo"], project_config["titlePrefix"]]
     try:
         issue_numbers = parse_issue_numbers(issue_ids)
     except ValueError as ex:
@@ -303,6 +400,7 @@ def get_issues():
 
 @app.get("/api/summary")
 def get_summary():
+    project_config = load_project_config()
     with get_connection() as conn:
         totals = conn.execute(
             """
@@ -310,7 +408,9 @@ def get_summary():
                 COUNT(*) AS total,
                 SUM(CASE WHEN analyzed_done = 1 THEN 1 ELSE 0 END) AS analyzed
             FROM issues
-            """
+            WHERE source_repo = ? AND title_prefix = ?
+            """,
+            (project_config["repo"], project_config["titlePrefix"]),
         ).fetchone()
 
     total = int(totals["total"] or 0)
@@ -324,6 +424,27 @@ def get_config():
         config = load_dashboard_config()
     except (json.JSONDecodeError, ValueError) as ex:
         return jsonify({"ok": False, "error": str(ex)}), 400
+    return jsonify({"ok": True, "config": config})
+
+
+@app.get("/api/project-config")
+def get_project_config():
+    try:
+        config = load_project_config()
+    except (json.JSONDecodeError, ValueError) as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+    return jsonify({"ok": True, "config": config})
+
+
+@app.post("/api/project-config")
+def post_project_config():
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict):
+        return jsonify({"ok": False, "error": "project config payload must be an object"}), 400
+
+    config = normalize_project_config(payload)
+    save_project_config(config)
+    init_db(config["repo"])
     return jsonify({"ok": True, "config": config})
 
 
@@ -377,6 +498,7 @@ def post_analysis(issue_id: int):
     return jsonify({"ok": True})
 
 
+init_project_config()
 init_db()
 
 if __name__ == "__main__":

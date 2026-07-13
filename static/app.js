@@ -1,4 +1,8 @@
 const syncBtn = document.getElementById("syncBtn");
+const configBtn = document.getElementById("configBtn");
+const repoLabel = document.getElementById("repoLabel");
+const titlePrefixLabel = document.getElementById("titlePrefixLabel");
+const dbLabel = document.getElementById("dbLabel");
 const viewMode = document.getElementById("viewMode");
 const stateFilter = document.getElementById("stateFilter");
 const issueIds = document.getElementById("issueIds");
@@ -22,11 +26,18 @@ const updatedTo = document.getElementById("updatedTo");
 const updatedToPicker = document.getElementById("updatedToPicker");
 const updatedToSelectBtn = document.getElementById("updatedToSelectBtn");
 const updatedToClearBtn = document.getElementById("updatedToClearBtn");
+const configModal = document.getElementById("configModal");
+const repoInput = document.getElementById("repoInput");
+const titlePrefixInput = document.getElementById("titlePrefixInput");
+const configCancelBtn = document.getElementById("configCancelBtn");
+const configSaveBtn = document.getElementById("configSaveBtn");
 const statusEl = document.getElementById("status");
 const summaryEl = document.getElementById("summary");
 const listEl = document.getElementById("list");
 
 const state = {
+  repo: "dotnet/runtime",
+  titlePrefix: "[ci-scan]",
   view: "all",
   issueState: "all",
   issueIds: "",
@@ -80,6 +91,7 @@ function renderIssueCard(x) {
       </div>
       <div class="actions">
         <label><input type="checkbox" ${x.analyzedDone ? "checked" : ""}> Mark analysis done</label>
+        <button class="quick-complete">Mark analyzed: completed</button>
         <button class="save">Save</button>
       </div>
     </div>
@@ -130,6 +142,59 @@ async function getJson(url, options = undefined) {
     throw new Error(data.error || `Request failed: ${resp.status}`);
   }
   return data;
+}
+
+function applyProjectConfig(config) {
+  const safe = config && typeof config === "object" ? config : {};
+
+  state.repo = typeof safe.repo === "string" && safe.repo ? safe.repo : state.repo;
+  state.titlePrefix = typeof safe.titlePrefix === "string" && safe.titlePrefix ? safe.titlePrefix : state.titlePrefix;
+
+  repoLabel.textContent = state.repo;
+  titlePrefixLabel.textContent = state.titlePrefix;
+  dbLabel.textContent = `data/${state.repo.replace("/", "_")}_issues.db`;
+  repoInput.value = state.repo;
+  titlePrefixInput.value = state.titlePrefix;
+}
+
+async function loadProjectConfig() {
+  const res = await getJson("/api/project-config");
+  applyProjectConfig(res.config || {});
+}
+
+function openConfigModal() {
+  repoInput.value = state.repo;
+  titlePrefixInput.value = state.titlePrefix;
+  configModal.classList.remove("hidden");
+}
+
+function closeConfigModal() {
+  configModal.classList.add("hidden");
+}
+
+async function saveProjectConfig() {
+  const repo = repoInput.value.trim();
+  const titlePrefix = titlePrefixInput.value.trim();
+  const repoParts = repo.split("/");
+  if (repoParts.length !== 2 || repoParts.some((part) => !part.trim())) {
+    statusEl.textContent = "Repository must use owner/repo format.";
+    return;
+  }
+  if (!titlePrefix) {
+    statusEl.textContent = "Title prefix is required.";
+    return;
+  }
+
+  const res = await getJson("/api/project-config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ repo, titlePrefix })
+  });
+  applyProjectConfig(res.config || {});
+  closeConfigModal();
+  statusEl.textContent = "Config saved. Sync from GitHub to load issues for this repo and title prefix.";
+  await refreshSummary();
+  await loadIssues();
 }
 
 function getConfigPayload() {
@@ -226,6 +291,7 @@ function wireActions() {
     const noteEl = card.querySelector("textarea");
     const doneEl = card.querySelector("input[type='checkbox']");
     const saveBtn = card.querySelector("button.save");
+    const quickCompleteBtn = card.querySelector("button.quick-complete");
 
     noteToggleBtn.addEventListener("click", () => {
       const isCollapsed = noteSectionEl.classList.toggle("collapsed");
@@ -248,6 +314,24 @@ function wireActions() {
         await loadIssues();
       } catch (err) {
         statusEl.textContent = `Save failed: ${err.message}`;
+      }
+    });
+
+    quickCompleteBtn.addEventListener("click", async () => {
+      try {
+        await getJson(`/api/issues/${id}/analysis`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            analyzedDone: true,
+            note: "completed"
+          })
+        });
+        await refreshSummary();
+        statusEl.textContent = "Marked analysis completed.";
+        await loadIssues();
+      } catch (err) {
+        statusEl.textContent = `Quick complete failed: ${err.message}`;
       }
     });
   }
@@ -298,6 +382,20 @@ async function syncIssues() {
 }
 
 syncBtn.addEventListener("click", syncIssues);
+configBtn.addEventListener("click", openConfigModal);
+configCancelBtn.addEventListener("click", closeConfigModal);
+configSaveBtn.addEventListener("click", async () => {
+  try {
+    await saveProjectConfig();
+  } catch (err) {
+    statusEl.textContent = `Config save failed: ${err.message}`;
+  }
+});
+configModal.addEventListener("click", (event) => {
+  if (event.target === configModal) {
+    closeConfigModal();
+  }
+});
 viewMode.addEventListener("change", async () => {
   state.view = viewMode.value;
   await loadIssuesAndPersistConfig();
@@ -406,6 +504,11 @@ updatedToClearBtn.addEventListener("click", async () => {
 
 async function init() {
   try {
+    try {
+      await loadProjectConfig();
+    } catch {
+      statusEl.textContent = "Could not load project config. Using defaults.";
+    }
     try {
       await loadDashboardConfig();
     } catch {

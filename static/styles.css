@@ -26,6 +26,14 @@ body {
   padding: 0 14px;
 }
 
+.config-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
 .bar {
   display: flex;
   gap: 10px;
@@ -226,4 +234,47 @@ textarea {
   align-items: center;
   gap: 10px;
   margin-top: 8px;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 1000;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-card {
+  width: min(460px, calc(100vw - 24px));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  padding: 16px;
+}
+
+.modal-card h3 {
+  margin: 0 0 12px;
+}
+
+.modal-field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.modal-field input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }

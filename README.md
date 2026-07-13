@@ -5,6 +5,7 @@ Local Flask dashboard for tracking `[ci-scan]` GitHub issues from `dotnet/runtim
 ## Features
 
 - Sync `[ci-scan]` issues from GitHub into a local SQLite database.
+- Configure the source GitHub repository and issue title prefix from the dashboard.
 - View issue title, state, created/updated timestamps, analysis status, and notes.
 - Mark each issue as analyzed or pending.
 - Add and save per-issue analysis notes locally.
@@ -29,12 +30,14 @@ Local Flask dashboard for tracking `[ci-scan]` GitHub issues from `dotnet/runtim
 
 ## Local Data
 
-- `data\issues.db` stores synced issue metadata, analysis status, and notes.
+- `data\<owner>_<repo>_issues.db` stores synced issue metadata, analysis status, and notes for each configured repo, for example `data\dotnet_runtime_issues.db`.
 - `data\ci-scan-issues.json` stores the latest raw issue snapshot from GitHub sync.
 - `data\dashboard-config.json` stores the last-used dashboard filters and display settings.
+- `ci-scan-config.json` stores the configured GitHub repository and issue title prefix.
 
 ## Notes
 
 - GitHub is the source for issue metadata.
 - Local SQLite is the source for analysis status and notes.
 - Local JSON config is the source for dashboard preferences.
+- Root JSON config is the source for the GitHub repository and title prefix.

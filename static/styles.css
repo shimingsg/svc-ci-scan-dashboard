@@ -34,21 +34,7 @@ body {
   flex-wrap: wrap;
 }
 
-.bar {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.bar label[for="showNoteDefault"] {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.datetime-panel {
+.filter-panel {
   display: grid;
   gap: 10px;
   border: 1px solid var(--border);
@@ -58,31 +44,68 @@ body {
   margin-bottom: 12px;
 }
 
-.datetime-panel strong {
+.filter-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   color: var(--muted);
 }
 
-.datetime-sort-row {
+.panel-header-actions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.datetime-row {
+.filter-row {
   display: flex;
-  align-items: flex-end;
-  gap: 16px;
+  align-items: center;
+  gap: 14px;
   flex-wrap: wrap;
 }
 
-.datetime-field {
+.filter-field {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.datetime-field label {
+.filter-field label {
+  color: var(--muted);
+  font-size: 13px;
   white-space: nowrap;
+}
+
+.issue-id-filter {
+  flex: 1 1 260px;
+}
+
+.field-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-panel-body {
+  display: grid;
+  gap: 10px;
+}
+
+.filter-panel-body.hidden {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .issue-id-filter {
+    grid-column: auto;
+  }
+}
+
+.corner-toggle {
+  min-width: 34px;
+  padding: 4px 10px;
+  line-height: 1;
 }
 
 button,
@@ -306,14 +329,28 @@ textarea {
 }
 
 .modal-field {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 12px;
 }
 
+.modal-field label {
+  flex: 0 0 96px;
+  color: var(--muted);
+}
+
 .modal-field input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   box-sizing: border-box;
+}
+
+.modal-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
 }
 
 .modal-actions {

@@ -10,83 +10,107 @@
   <div class="wrap">
     <h1>[CI-Scan] Dashboard</h1>
     <div class="config-line muted">
-      <span>Repo: <strong id="repoLabel">dotnet/runtime</strong> · title prefix: <strong id="titlePrefixLabel">[ci-scan]</strong> · current db: <strong id="dbLabel">data/dotnet_runtime_issues.db</strong></span>
-      <button id="configBtn" type="button">Config</button>
+      <span>Repo: <strong id="repoLabel">dotnet/runtime</strong> · Title Prefix: <strong id="titlePrefixLabel">[ci-scan]</strong> · Current DB: <strong id="dbLabel">data/dotnet_runtime_issues.db</strong></span>
+      <button id="configBtn" type="button">Setting</button>
     </div>
 
-    <div class="bar">
-      <button id="syncBtn">Sync from GitHub</button>
-      <label for="viewMode">Show:</label>
-      <select id="viewMode">
-        <option value="all">All issues</option>
-        <option value="analyzed">Analyzed only</option>
-        <option value="pending">Pending only</option>
-      </select>
-      <label for="stateFilter">State:</label>
-      <select id="stateFilter">
-        <option value="all">All states</option>
-        <option value="open">Open</option>
-        <option value="closed">Closed</option>
-      </select>
-      <label for="issueIds">Issue ID(s):</label>
-      <input id="issueIds" type="text" placeholder="123,456" />
-      <label for="showNoteDefault">
-        <input id="showNoteDefault" type="checkbox" />
-        Show note by default
-      </label>
-    </div>
-
-    <div class="datetime-panel">
-      <div class="datetime-sort-row">
-        <strong class="muted">Sort:</strong>
-        <select id="sortBy">
-          <option value="createdAt">createdAt</option>
-          <option value="updatedAt">updatedAt</option>
-        </select>
-        <select id="sortDir">
-          <option value="desc">Newest first</option>
-          <option value="asc">Oldest first</option>
-        </select>
-        <strong class="muted">Group:</strong>
-        <select id="groupBy">
-          <option value="none">None</option>
-          <option value="status">Status</option>
-          <option value="createdAt">Created date</option>
-        </select>
+    <div class="filter-panel">
+      <div class="filter-panel-header">
+        <strong>Issue filters</strong>
+        <div class="panel-header-actions">
+          <button id="syncBtn">Sync from GitHub</button>
+          <button id="issueFilterToggle" type="button" class="corner-toggle" aria-expanded="true" aria-label="Hide issue filters">▾</button>
+        </div>
       </div>
-      <div class="datetime-row">
-        <div class="datetime-field">
-          <label for="createdFrom">Created from:</label>
-          <div class="datetime-input-group">
-            <input id="createdFrom" type="text" placeholder="YYYY-MM-DDTHH:mm" />
-            <input id="createdFromPicker" type="datetime-local" class="picker-hidden" />
-            <button id="createdFromClearBtn" type="button">Clear</button>
+      <div id="issueFilterBody" class="filter-panel-body">
+        <div class="filter-row">
+          <div class="filter-field">
+            <label for="viewMode" title="Local analysis state">Show</label>
+            <select id="viewMode">
+              <option value="all">All issues</option>
+              <option value="analyzed">Analyzed only</option>
+              <option value="pending">Pending only</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label for="stateFilter" title="GitHub issue state">State</label>
+            <select id="stateFilter">
+              <option value="all">All states</option>
+              <option value="open">Open</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+          <div class="filter-field issue-id-filter">
+            <label for="issueIds">Issue ID(s)</label>
+            <input id="issueIds" type="text" placeholder="e.g. 123,456" />
           </div>
         </div>
-        <div class="datetime-field">
-          <label for="createdTo">Created to:</label>
-          <div class="datetime-input-group">
-            <input id="createdTo" type="text" placeholder="YYYY-MM-DDTHH:mm" />
-            <input id="createdToPicker" type="datetime-local" class="picker-hidden" />
-            <button id="createdToClearBtn" type="button">Clear</button>
+        <div class="filter-row">
+          <div class="filter-field">
+            <label for="sortBy">Sort</label>
+            <div class="field-row">
+              <select id="sortBy">
+                <option value="createdAt">createdAt</option>
+                <option value="updatedAt">updatedAt</option>
+              </select>
+              <select id="sortDir">
+                <option value="desc">Newest first</option>
+                <option value="asc">Oldest first</option>
+              </select>
+            </div>
+          </div>
+          <div class="filter-field">
+            <label for="groupBy">Group</label>
+            <select id="groupBy">
+              <option value="none">None</option>
+              <option value="status">Status</option>
+              <option value="createdAt">Created date</option>
+            </select>
           </div>
         </div>
       </div>
-      <div class="datetime-row">
-        <div class="datetime-field">
-          <label for="updatedFrom">Updated from:</label>
-          <div class="datetime-input-group">
-            <input id="updatedFrom" type="text" placeholder="YYYY-MM-DDTHH:mm" />
-            <input id="updatedFromPicker" type="datetime-local" class="picker-hidden" />
-            <button id="updatedFromClearBtn" type="button">Clear</button>
+    </div>
+
+    <div class="filter-panel">
+      <div class="filter-panel-header">
+        <strong>Date filters</strong>
+        <button id="dateFilterToggle" type="button" class="corner-toggle" aria-expanded="false" aria-label="Show date filters">▸</button>
+      </div>
+      <div id="dateFilterBody" class="filter-panel-body hidden">
+        <div class="filter-row">
+          <div class="filter-field">
+            <label for="createdFrom">Created from:</label>
+            <div class="datetime-input-group">
+              <input id="createdFrom" type="text" placeholder="YYYY-MM-DDTHH:mm" />
+              <input id="createdFromPicker" type="datetime-local" class="picker-hidden" />
+              <button id="createdFromClearBtn" type="button">Clear</button>
+            </div>
+          </div>
+          <div class="filter-field">
+            <label for="createdTo">Created to:</label>
+            <div class="datetime-input-group">
+              <input id="createdTo" type="text" placeholder="YYYY-MM-DDTHH:mm" />
+              <input id="createdToPicker" type="datetime-local" class="picker-hidden" />
+              <button id="createdToClearBtn" type="button">Clear</button>
+            </div>
           </div>
         </div>
-        <div class="datetime-field">
-          <label for="updatedTo">Updated to:</label>
-          <div class="datetime-input-group">
-            <input id="updatedTo" type="text" placeholder="YYYY-MM-DDTHH:mm" />
-            <input id="updatedToPicker" type="datetime-local" class="picker-hidden" />
-            <button id="updatedToClearBtn" type="button">Clear</button>
+        <div class="filter-row">
+          <div class="filter-field">
+            <label for="updatedFrom">Updated from:</label>
+            <div class="datetime-input-group">
+              <input id="updatedFrom" type="text" placeholder="YYYY-MM-DDTHH:mm" />
+              <input id="updatedFromPicker" type="datetime-local" class="picker-hidden" />
+              <button id="updatedFromClearBtn" type="button">Clear</button>
+            </div>
+          </div>
+          <div class="filter-field">
+            <label for="updatedTo">Updated to:</label>
+            <div class="datetime-input-group">
+              <input id="updatedTo" type="text" placeholder="YYYY-MM-DDTHH:mm" />
+              <input id="updatedToPicker" type="datetime-local" class="picker-hidden" />
+              <button id="updatedToClearBtn" type="button">Clear</button>
+            </div>
           </div>
         </div>
       </div>
@@ -99,15 +123,27 @@
 
   <div id="configModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="configModalTitle">
     <div class="modal-card">
-      <h3 id="configModalTitle">Dashboard Config</h3>
+      <h3 id="configModalTitle">Dashboard Setting</h3>
       <div class="modal-field">
         <label for="repoInput">Repository</label>
         <input id="repoInput" type="text" placeholder="owner/repo" />
       </div>
       <div class="modal-field">
-        <label for="titlePrefixInput">Title prefix</label>
+        <label for="titlePrefixInput">Title Prefix</label>
         <input id="titlePrefixInput" type="text" placeholder="[ci-scan]" />
       </div>
+      <label class="modal-check" for="showNoteDefault">
+        <input id="showNoteDefault" type="checkbox" />
+        Show note by default
+      </label>
+      <label class="modal-check" for="issueFiltersExpandedDefault">
+        <input id="issueFiltersExpandedDefault" type="checkbox" />
+        Expand issue filters by default
+      </label>
+      <label class="modal-check" for="dateFiltersExpandedDefault">
+        <input id="dateFiltersExpandedDefault" type="checkbox" />
+        Expand date filters by default
+      </label>
       <div class="modal-actions">
         <button id="configCancelBtn" type="button">Cancel</button>
         <button id="configSaveBtn" type="button">Save</button>

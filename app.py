@@ -29,6 +29,8 @@ DEFAULT_DASHBOARD_CONFIG = {
     "sortDir": "desc",
     "groupBy": "none",
     "showNoteByDefault": False,
+    "issueFiltersExpanded": True,
+    "dateFiltersExpanded": False,
     "createdFrom": "",
     "createdTo": "",
     "updatedFrom": "",
@@ -237,6 +239,8 @@ def normalize_dashboard_config(raw: dict) -> dict:
     normalized["sortDir"] = _pick("sortDir", {"asc", "desc"})
     normalized["groupBy"] = _pick("groupBy", {"none", "status", "createdAt"})
     normalized["showNoteByDefault"] = bool(raw.get("showNoteByDefault", normalized["showNoteByDefault"]))
+    normalized["issueFiltersExpanded"] = bool(raw.get("issueFiltersExpanded", normalized["issueFiltersExpanded"]))
+    normalized["dateFiltersExpanded"] = bool(raw.get("dateFiltersExpanded", normalized["dateFiltersExpanded"]))
 
     for key in ["issueIds", "createdFrom", "createdTo", "updatedFrom", "updatedTo"]:
         value = raw.get(key, normalized[key])

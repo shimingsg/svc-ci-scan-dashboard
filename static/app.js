@@ -10,6 +10,10 @@ const showNoteDefault = document.getElementById("showNoteDefault");
 const sortBy = document.getElementById("sortBy");
 const sortDir = document.getElementById("sortDir");
 const groupBy = document.getElementById("groupBy");
+const issueFilterToggle = document.getElementById("issueFilterToggle");
+const issueFilterBody = document.getElementById("issueFilterBody");
+const dateFilterToggle = document.getElementById("dateFilterToggle");
+const dateFilterBody = document.getElementById("dateFilterBody");
 const createdFrom = document.getElementById("createdFrom");
 const createdFromPicker = document.getElementById("createdFromPicker");
 const createdFromClearBtn = document.getElementById("createdFromClearBtn");
@@ -25,6 +29,8 @@ const updatedToClearBtn = document.getElementById("updatedToClearBtn");
 const configModal = document.getElementById("configModal");
 const repoInput = document.getElementById("repoInput");
 const titlePrefixInput = document.getElementById("titlePrefixInput");
+const issueFiltersExpandedDefault = document.getElementById("issueFiltersExpandedDefault");
+const dateFiltersExpandedDefault = document.getElementById("dateFiltersExpandedDefault");
 const configCancelBtn = document.getElementById("configCancelBtn");
 const configSaveBtn = document.getElementById("configSaveBtn");
 const statusPanel = document.getElementById("statusPanel");
@@ -41,6 +47,8 @@ const state = {
   sortDir: "desc",
   groupBy: "none",
   showNoteByDefault: false,
+  issueFiltersExpanded: true,
+  dateFiltersExpanded: false,
   createdFrom: "",
   createdTo: "",
   updatedFrom: "",
@@ -68,6 +76,19 @@ function formatGroupDate(value) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "Unknown";
   return d.toLocaleDateString();
+}
+
+function applyPanelExpandedState(bodyEl, toggleEl, isExpanded, label) {
+  bodyEl.classList.toggle("hidden", !isExpanded);
+  toggleEl.textContent = isExpanded ? "▾" : "▸";
+  toggleEl.setAttribute("aria-expanded", String(isExpanded));
+  toggleEl.setAttribute("aria-label", isExpanded ? `Hide ${label} filters` : `Show ${label} filters`);
+}
+
+async function togglePanelExpanded(bodyEl, toggleEl, key, label) {
+  state[key] = !state[key];
+  applyPanelExpandedState(bodyEl, toggleEl, state[key], label);
+  await saveDashboardConfig();
 }
 
 function renderIssueCard(x) {
@@ -161,6 +182,9 @@ async function loadProjectConfig() {
 function openConfigModal() {
   repoInput.value = state.repo;
   titlePrefixInput.value = state.titlePrefix;
+  showNoteDefault.checked = state.showNoteByDefault;
+  issueFiltersExpandedDefault.checked = state.issueFiltersExpanded;
+  dateFiltersExpandedDefault.checked = state.dateFiltersExpanded;
   configModal.classList.remove("hidden");
 }
 
@@ -186,6 +210,12 @@ async function saveProjectConfig() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ repo, titlePrefix })
   });
+  state.showNoteByDefault = showNoteDefault.checked;
+  state.issueFiltersExpanded = issueFiltersExpandedDefault.checked;
+  state.dateFiltersExpanded = dateFiltersExpandedDefault.checked;
+  applyPanelExpandedState(issueFilterBody, issueFilterToggle, state.issueFiltersExpanded, "issue");
+  applyPanelExpandedState(dateFilterBody, dateFilterToggle, state.dateFiltersExpanded, "date");
+  await saveDashboardConfig();
   applyProjectConfig(res.config || {});
   closeConfigModal();
   statusEl.textContent = "Config saved. Sync from GitHub to load issues for this repo and title prefix.";
@@ -202,6 +232,8 @@ function getConfigPayload() {
     sortDir: state.sortDir,
     groupBy: state.groupBy,
     showNoteByDefault: state.showNoteByDefault,
+    issueFiltersExpanded: state.issueFiltersExpanded,
+    dateFiltersExpanded: state.dateFiltersExpanded,
     createdFrom: state.createdFrom,
     createdTo: state.createdTo,
     updatedFrom: state.updatedFrom,
@@ -232,6 +264,8 @@ function applyDashboardConfig(config) {
   state.sortDir = typeof safe.sortDir === "string" ? safe.sortDir : state.sortDir;
   state.groupBy = typeof safe.groupBy === "string" ? safe.groupBy : state.groupBy;
   state.showNoteByDefault = Boolean(safe.showNoteByDefault);
+  state.issueFiltersExpanded = typeof safe.issueFiltersExpanded === "boolean" ? safe.issueFiltersExpanded : state.issueFiltersExpanded;
+  state.dateFiltersExpanded = typeof safe.dateFiltersExpanded === "boolean" ? safe.dateFiltersExpanded : state.dateFiltersExpanded;
   state.createdFrom = typeof safe.createdFrom === "string" ? safe.createdFrom : "";
   state.createdTo = typeof safe.createdTo === "string" ? safe.createdTo : "";
   state.updatedFrom = typeof safe.updatedFrom === "string" ? safe.updatedFrom : "";
@@ -244,6 +278,10 @@ function applyDashboardConfig(config) {
   sortDir.value = state.sortDir;
   groupBy.value = state.groupBy;
   showNoteDefault.checked = state.showNoteByDefault;
+  issueFiltersExpandedDefault.checked = state.issueFiltersExpanded;
+  dateFiltersExpandedDefault.checked = state.dateFiltersExpanded;
+  applyPanelExpandedState(issueFilterBody, issueFilterToggle, state.issueFiltersExpanded, "issue");
+  applyPanelExpandedState(dateFilterBody, dateFilterToggle, state.dateFiltersExpanded, "date");
 
   createdFrom.value = state.createdFrom;
   createdTo.value = state.createdTo;
@@ -424,10 +462,6 @@ issueIds.addEventListener("change", async () => {
     statusEl.textContent = `Issue ID filter failed: ${err.message}`;
   }
 });
-showNoteDefault.addEventListener("change", async () => {
-  state.showNoteByDefault = showNoteDefault.checked;
-  await loadIssuesAndPersistConfig();
-});
 sortBy.addEventListener("change", async () => {
   state.sortBy = sortBy.value;
   await loadIssuesAndPersistConfig();
@@ -439,6 +473,12 @@ sortDir.addEventListener("change", async () => {
 groupBy.addEventListener("change", async () => {
   state.groupBy = groupBy.value;
   await loadIssuesAndPersistConfig();
+});
+issueFilterToggle.addEventListener("click", async () => {
+  await togglePanelExpanded(issueFilterBody, issueFilterToggle, "issueFiltersExpanded", "issue");
+});
+dateFilterToggle.addEventListener("click", async () => {
+  await togglePanelExpanded(dateFilterBody, dateFilterToggle, "dateFiltersExpanded", "date");
 });
 
 function toIsoOrEmpty(v) {

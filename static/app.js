@@ -31,6 +31,7 @@ const repoInput = document.getElementById("repoInput");
 const titlePrefixInput = document.getElementById("titlePrefixInput");
 const configCancelBtn = document.getElementById("configCancelBtn");
 const configSaveBtn = document.getElementById("configSaveBtn");
+const statusPanel = document.getElementById("statusPanel");
 const statusEl = document.getElementById("status");
 const summaryEl = document.getElementById("summary");
 const listEl = document.getElementById("list");
@@ -281,6 +282,23 @@ async function loadIssuesAndPersistConfig() {
 async function refreshSummary() {
   const summary = await getJson("/api/summary");
   summaryEl.textContent = `${summary.analyzed}/${summary.total} analyzed`;
+  statusPanel.innerHTML = `
+    <div class="status-card total">
+      <div class="status-label">Total</div>
+      <div class="status-value">${summary.total}</div>
+      <div class="status-breakdown">Open ${summary.open} · Closed ${summary.closed}</div>
+    </div>
+    <div class="status-card analyzed">
+      <div class="status-label">Analyzed</div>
+      <div class="status-value">${summary.analyzed}</div>
+      <div class="status-breakdown">Open ${summary.analyzedOpen} · Closed ${summary.analyzedClosed}</div>
+    </div>
+    <div class="status-card pending">
+      <div class="status-label">Pending</div>
+      <div class="status-value">${summary.pending}</div>
+      <div class="status-breakdown">Open ${summary.pendingOpen} · Closed ${summary.pendingClosed}</div>
+    </div>
+  `;
 }
 
 function wireActions() {

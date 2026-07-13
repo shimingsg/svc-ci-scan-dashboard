@@ -406,7 +406,14 @@ def get_summary():
             """
             SELECT
                 COUNT(*) AS total,
-                SUM(CASE WHEN analyzed_done = 1 THEN 1 ELSE 0 END) AS analyzed
+                SUM(CASE WHEN analyzed_done = 1 THEN 1 ELSE 0 END) AS analyzed,
+                SUM(CASE WHEN analyzed_done = 0 THEN 1 ELSE 0 END) AS pending,
+                SUM(CASE WHEN state = 'open' THEN 1 ELSE 0 END) AS open,
+                SUM(CASE WHEN state = 'closed' THEN 1 ELSE 0 END) AS closed,
+                SUM(CASE WHEN analyzed_done = 1 AND state = 'open' THEN 1 ELSE 0 END) AS analyzed_open,
+                SUM(CASE WHEN analyzed_done = 1 AND state = 'closed' THEN 1 ELSE 0 END) AS analyzed_closed,
+                SUM(CASE WHEN analyzed_done = 0 AND state = 'open' THEN 1 ELSE 0 END) AS pending_open,
+                SUM(CASE WHEN analyzed_done = 0 AND state = 'closed' THEN 1 ELSE 0 END) AS pending_closed
             FROM issues
             WHERE source_repo = ? AND title_prefix = ?
             """,
@@ -415,7 +422,19 @@ def get_summary():
 
     total = int(totals["total"] or 0)
     analyzed = int(totals["analyzed"] or 0)
-    return jsonify({"total": total, "analyzed": analyzed})
+    return jsonify(
+        {
+            "total": total,
+            "analyzed": analyzed,
+            "pending": int(totals["pending"] or 0),
+            "open": int(totals["open"] or 0),
+            "closed": int(totals["closed"] or 0),
+            "analyzedOpen": int(totals["analyzed_open"] or 0),
+            "analyzedClosed": int(totals["analyzed_closed"] or 0),
+            "pendingOpen": int(totals["pending_open"] or 0),
+            "pendingClosed": int(totals["pending_closed"] or 0),
+        }
+    )
 
 
 @app.get("/api/config")

@@ -142,6 +142,44 @@ input[type="datetime-local"] {
   color: var(--muted);
 }
 
+.status-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.status-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  padding: 12px;
+}
+
+.status-card.analyzed {
+  border-color: var(--okb);
+}
+
+.status-card.pending {
+  border-color: var(--warnb);
+}
+
+.status-label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.status-value {
+  margin: 4px 0;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.status-breakdown {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .list {
   display: grid;
   gap: 10px;

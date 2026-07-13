@@ -25,6 +25,7 @@ app = Flask(__name__)
 DEFAULT_DASHBOARD_CONFIG = {
     "view": "all",
     "state": "all",
+    "issueIds": "",
     "sortBy": "createdAt",
     "sortDir": "desc",
     "groupBy": "none",
@@ -138,11 +139,27 @@ def normalize_dashboard_config(raw: dict) -> dict:
     normalized["groupBy"] = _pick("groupBy", {"none", "status", "createdAt"})
     normalized["showNoteByDefault"] = bool(raw.get("showNoteByDefault", normalized["showNoteByDefault"]))
 
-    for key in ["createdFrom", "createdTo", "updatedFrom", "updatedTo"]:
+    for key in ["issueIds", "createdFrom", "createdTo", "updatedFrom", "updatedTo"]:
         value = raw.get(key, normalized[key])
         normalized[key] = value if isinstance(value, str) else ""
 
     return normalized
+
+
+def parse_issue_numbers(raw: str | None) -> list[int]:
+    if not raw:
+        return []
+
+    issue_numbers: list[int] = []
+    for part in raw.split(","):
+        value = part.strip()
+        if not value:
+            continue
+        if not value.isdecimal():
+            raise ValueError("issue IDs must be numbers separated by commas")
+        issue_numbers.append(int(value))
+
+    return issue_numbers
 
 
 def load_dashboard_config() -> dict:
@@ -213,6 +230,7 @@ def index():
 def get_issues():
     view = request.args.get("view", "all")
     issue_state = request.args.get("state", "all")
+    issue_ids = request.args.get("issueIds")
     sort_by = request.args.get("sortBy", "createdAt")
     sort_dir = request.args.get("sortDir", "desc")
     created_from = request.args.get("createdFrom")
@@ -222,6 +240,11 @@ def get_issues():
 
     clauses: list[str] = []
     params: list[str] = []
+    try:
+        issue_numbers = parse_issue_numbers(issue_ids)
+    except ValueError as ex:
+        return jsonify({"ok": False, "error": str(ex)}), 400
+
     if view == "analyzed":
         clauses.append("analyzed_done = 1")
     if view == "pending":
@@ -229,6 +252,9 @@ def get_issues():
     if issue_state in {"open", "closed"}:
         clauses.append("state = ?")
         params.append(issue_state)
+    if issue_numbers:
+        clauses.append(f"number IN ({', '.join('?' for _ in issue_numbers)})")
+        params.extend(str(n) for n in issue_numbers)
     if created_from:
         clauses.append("datetime(created_at) >= datetime(?)")
         params.append(created_from)

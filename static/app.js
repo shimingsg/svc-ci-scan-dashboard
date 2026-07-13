@@ -1,6 +1,7 @@
 const syncBtn = document.getElementById("syncBtn");
 const viewMode = document.getElementById("viewMode");
 const stateFilter = document.getElementById("stateFilter");
+const issueIds = document.getElementById("issueIds");
 const showNoteDefault = document.getElementById("showNoteDefault");
 const sortBy = document.getElementById("sortBy");
 const sortDir = document.getElementById("sortDir");
@@ -28,6 +29,7 @@ const listEl = document.getElementById("list");
 const state = {
   view: "all",
   issueState: "all",
+  issueIds: "",
   sortBy: "createdAt",
   sortDir: "desc",
   groupBy: "none",
@@ -134,6 +136,7 @@ function getConfigPayload() {
   return {
     view: state.view,
     state: state.issueState,
+    issueIds: state.issueIds,
     sortBy: state.sortBy,
     sortDir: state.sortDir,
     groupBy: state.groupBy,
@@ -163,6 +166,7 @@ function applyDashboardConfig(config) {
 
   state.view = typeof safe.view === "string" ? safe.view : state.view;
   state.issueState = typeof safe.state === "string" ? safe.state : state.issueState;
+  state.issueIds = typeof safe.issueIds === "string" ? safe.issueIds : "";
   state.sortBy = typeof safe.sortBy === "string" ? safe.sortBy : state.sortBy;
   state.sortDir = typeof safe.sortDir === "string" ? safe.sortDir : state.sortDir;
   state.groupBy = typeof safe.groupBy === "string" ? safe.groupBy : state.groupBy;
@@ -174,6 +178,7 @@ function applyDashboardConfig(config) {
 
   viewMode.value = state.view;
   stateFilter.value = state.issueState;
+  issueIds.value = state.issueIds;
   sortBy.value = state.sortBy;
   sortDir.value = state.sortDir;
   groupBy.value = state.groupBy;
@@ -255,6 +260,7 @@ async function loadIssues() {
     sortBy: state.sortBy,
     sortDir: state.sortDir
   });
+  if (state.issueIds) qs.set("issueIds", state.issueIds);
   if (state.createdFrom) qs.set("createdFrom", state.createdFrom);
   if (state.createdTo) qs.set("createdTo", state.createdTo);
   if (state.updatedFrom) qs.set("updatedFrom", state.updatedFrom);
@@ -299,6 +305,14 @@ viewMode.addEventListener("change", async () => {
 stateFilter.addEventListener("change", async () => {
   state.issueState = stateFilter.value;
   await loadIssuesAndPersistConfig();
+});
+issueIds.addEventListener("change", async () => {
+  state.issueIds = issueIds.value.trim();
+  try {
+    await loadIssuesAndPersistConfig();
+  } catch (err) {
+    statusEl.textContent = `Issue ID filter failed: ${err.message}`;
+  }
 });
 showNoteDefault.addEventListener("change", async () => {
   state.showNoteByDefault = showNoteDefault.checked;

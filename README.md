@@ -1,14 +1,40 @@
 # CI Scan Dashboard (Python)
 
+Local Flask dashboard for tracking `[ci-scan]` GitHub issues from `dotnet/runtime`.
+
+## Features
+
+- Sync `[ci-scan]` issues from GitHub into a local SQLite database.
+- View issue title, state, created/updated timestamps, analysis status, and notes.
+- Mark each issue as analyzed or pending.
+- Add and save per-issue analysis notes locally.
+- Collapse or expand issue notes, with pending issues expanded by default.
+- Filter issues by:
+  - analysis state: all, analyzed only, pending only
+  - GitHub issue state: all, open, closed
+  - one or more issue IDs, separated by commas
+  - created date range
+  - updated date range
+- Sort by `createdAt` or `updatedAt`, newest or oldest first.
+- Group visible issues by status or created date.
+- Remember the last dashboard filters and display settings in local JSON config.
+- Use an eye-friendly dark theme for long review sessions.
+
 ## Run
 
-1. `cd D:\mycopilot\ci-scan-dashboard`
+1. `cd ~\svc-ci-scan-dashboard`
 2. `uv sync`
 3. `uv run python app.py`
 4. Open `http://127.0.0.1:8000`
 
+## Local Data
+
+- `data\issues.db` stores synced issue metadata, analysis status, and notes.
+- `data\ci-scan-issues.json` stores the latest raw issue snapshot from GitHub sync.
+- `data\dashboard-config.json` stores the last-used dashboard filters and display settings.
+
 ## Notes
 
-- Sync fetches `[ci-scan]` issues directly from GitHub (`dotnet/runtime`) and writes datasource JSON to `data\ci-scan-issues.json`.
-- Analysis status and notes are saved in local SQLite: `data\issues.db`.
-- Dashboard filters/view settings are saved to local JSON config: `data\dashboard-config.json`.
+- GitHub is the source for issue metadata.
+- Local SQLite is the source for analysis status and notes.
+- Local JSON config is the source for dashboard preferences.

@@ -6,6 +6,7 @@ Local Flask dashboard for tracking `[ci-scan]` GitHub issues from `dotnet/runtim
 
 - Sync `[ci-scan]` issues from GitHub into a local SQLite database.
 - Configure the source GitHub repository and issue title prefix from the dashboard.
+- Automatically mark issues closed as completed, duplicated, or not planned as analyzed with matching notes during sync.
 - View issue title, state, created/updated timestamps, analysis status, and notes.
 - Mark each issue as analyzed or pending.
 - Add and save per-issue analysis notes locally.

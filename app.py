@@ -150,6 +150,21 @@ def init_project_config() -> None:
         save_project_config(dict(DEFAULT_PROJECT_CONFIG))
 
 
+def get_auto_analysis_note(row: dict) -> str:
+    if row.get("state") != "closed":
+        return ""
+
+    close_reason = str(row.get("stateReason") or "").lower()
+    if close_reason == "completed":
+        return "completed"
+    if close_reason in {"duplicate", "duplicated"}:
+        return "duplicated"
+    if close_reason == "not_planned":
+        return "Closed as not planned"
+
+    return ""
+
+
 def fetch_github_ci_scan_issues(project_config: dict) -> list[dict]:
     repo = project_config["repo"]
     title_prefix = project_config["titlePrefix"]
@@ -195,6 +210,7 @@ def fetch_github_ci_scan_issues(project_config: dict) -> list[dict]:
                 "url": item.get("html_url", ""),
                 "createdAt": item.get("created_at", ""),
                 "updatedAt": item.get("updated_at", ""),
+                "stateReason": item.get("state_reason", ""),
             }
 
         if len(items) < per_page:
@@ -274,13 +290,14 @@ def sync_issues() -> int:
 
     with get_connection() as conn:
         for row in rows:
+            auto_note = get_auto_analysis_note(row)
             conn.execute(
                 """
                 INSERT INTO issues (
                     id, number, title, state, url, created_at, updated_at,
                     analyzed_done, note, source_repo, title_prefix
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, 0, '', ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     number = excluded.number,
                     title = excluded.title,
@@ -290,8 +307,14 @@ def sync_issues() -> int:
                     updated_at = excluded.updated_at,
                     source_repo = excluded.source_repo,
                     title_prefix = excluded.title_prefix,
-                    analyzed_done = issues.analyzed_done,
-                    note = issues.note
+                    analyzed_done = CASE
+                        WHEN excluded.analyzed_done = 1 THEN 1
+                        ELSE issues.analyzed_done
+                    END,
+                    note = CASE
+                        WHEN excluded.analyzed_done = 1 THEN excluded.note
+                        ELSE issues.note
+                    END
                 """,
                 (
                     row["id"],
@@ -301,6 +324,8 @@ def sync_issues() -> int:
                     row["url"],
                     row["createdAt"],
                     row["updatedAt"],
+                    1 if auto_note else 0,
+                    auto_note,
                     project_config["repo"],
                     project_config["titlePrefix"],
                 ),

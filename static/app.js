@@ -12,19 +12,15 @@ const sortDir = document.getElementById("sortDir");
 const groupBy = document.getElementById("groupBy");
 const createdFrom = document.getElementById("createdFrom");
 const createdFromPicker = document.getElementById("createdFromPicker");
-const createdFromSelectBtn = document.getElementById("createdFromSelectBtn");
 const createdFromClearBtn = document.getElementById("createdFromClearBtn");
 const createdTo = document.getElementById("createdTo");
 const createdToPicker = document.getElementById("createdToPicker");
-const createdToSelectBtn = document.getElementById("createdToSelectBtn");
 const createdToClearBtn = document.getElementById("createdToClearBtn");
 const updatedFrom = document.getElementById("updatedFrom");
 const updatedFromPicker = document.getElementById("updatedFromPicker");
-const updatedFromSelectBtn = document.getElementById("updatedFromSelectBtn");
 const updatedFromClearBtn = document.getElementById("updatedFromClearBtn");
 const updatedTo = document.getElementById("updatedTo");
 const updatedToPicker = document.getElementById("updatedToPicker");
-const updatedToSelectBtn = document.getElementById("updatedToSelectBtn");
 const updatedToClearBtn = document.getElementById("updatedToClearBtn");
 const configModal = document.getElementById("configModal");
 const repoInput = document.getElementById("repoInput");
@@ -33,7 +29,6 @@ const configCancelBtn = document.getElementById("configCancelBtn");
 const configSaveBtn = document.getElementById("configSaveBtn");
 const statusPanel = document.getElementById("statusPanel");
 const statusEl = document.getElementById("status");
-const summaryEl = document.getElementById("summary");
 const listEl = document.getElementById("list");
 
 const state = {
@@ -281,7 +276,6 @@ async function loadIssuesAndPersistConfig() {
 
 async function refreshSummary() {
   const summary = await getJson("/api/summary");
-  summaryEl.textContent = `${summary.analyzed}/${summary.total} analyzed`;
   statusPanel.innerHTML = `
     <div class="status-card total">
       <div class="status-label">Total</div>
@@ -480,12 +474,12 @@ async function applyDateTextInput(inputEl, key) {
   await loadIssuesAndPersistConfig();
 }
 
-function bindDateInput(textInput, pickerInput, selectBtn, key) {
+function bindDateInput(textInput, pickerInput, key) {
   textInput.addEventListener("change", async () => {
     await applyDateTextInput(textInput, key);
   });
 
-  selectBtn.addEventListener("click", () => {
+  textInput.addEventListener("focus", () => {
     openPicker(pickerInput);
   });
 
@@ -495,10 +489,10 @@ function bindDateInput(textInput, pickerInput, selectBtn, key) {
   });
 }
 
-bindDateInput(createdFrom, createdFromPicker, createdFromSelectBtn, "createdFrom");
-bindDateInput(createdTo, createdToPicker, createdToSelectBtn, "createdTo");
-bindDateInput(updatedFrom, updatedFromPicker, updatedFromSelectBtn, "updatedFrom");
-bindDateInput(updatedTo, updatedToPicker, updatedToSelectBtn, "updatedTo");
+bindDateInput(createdFrom, createdFromPicker, "createdFrom");
+bindDateInput(createdTo, createdToPicker, "createdTo");
+bindDateInput(updatedFrom, updatedFromPicker, "updatedFrom");
+bindDateInput(updatedTo, updatedToPicker, "updatedTo");
 
 async function clearSingleDateFilter(textInput, pickerInput, key) {
   textInput.value = "";

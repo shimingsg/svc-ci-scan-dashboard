@@ -76,8 +76,13 @@ body {
 }
 
 .datetime-field {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.datetime-field label {
+  white-space: nowrap;
 }
 
 button,
